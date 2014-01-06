@@ -9,7 +9,7 @@ Excel Tools is an extension library for the Apache POI library.  In using Apache
 
 Version History
 ---------------
-See (Version History)["/version_history.md"]
+See [Version History](/version_history.md)
 
 
 License
