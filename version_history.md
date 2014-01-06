@@ -1,6 +1,5 @@
 Version History
-
-===========
+===============
 
 * 0.5 -- Initial Saved Version
 	* Tools for file manipulation
