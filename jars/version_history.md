@@ -2,7 +2,7 @@ Version History
 ===============
 
 * 0.5.1 -- **Bug fixes**
-* 0.5	-- **Initial Saved Version**
+* 0.5.0 -- **Initial Saved Version**
 	* Tools for file manipulation
 		* Path joining
 		* File opening
