@@ -1,2 +1,46 @@
+bin/**
+.settings
+*.swp
+
+
+# Compiled source #
+###################
+*.com
 *.class
-.DS_STORE
+*.dll
+*.exe
+*.o
+*.so
+*.pyc
+*.html~
+*.py~
+
+# Packages #
+############
+# it's better to unpack these files and commit the raw source
+# git has its own built in compression methods
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Logs and databases #
+######################
+*.log
+*.sql
+*.sqlite
+*.db
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+.classpath
+.project
+._*
+.Spotlight-V100
+.Trashes
