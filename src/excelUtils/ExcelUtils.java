@@ -15,43 +15,84 @@
  * 
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+ * POI Extension Utilities
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+ *  Library aimed at extending the Apache POI Library
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * To do:
+ * 		[ ] Add regex search support
+ * 		[ ] Add more thorough clearing methods
+ * 		[ ] Add wrappers for Excel Based index usage
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 
 package excelUtils;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FormulaError;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 
 public class ExcelUtils {
-	public static boolean ROW_CREATE_NULL_AS_BLANK = true;
+	public static boolean ROW_CREATE_NULL_AS_BLANK  = true;
 	public static boolean CELL_CREATE_NULL_AS_BLANK = true;
 
-	public static void copySheetSection(Sheet originSheet,
+	public static Sheet copySheetSection(Sheet originSheet,
 			int originRowStart, int originRowEnd,
 			int originColStart, int originColEnd,
-			Sheet destinationSheet, int pasteLocation) {
-		//Row r; Cell c;
+			Sheet destinationSheet) {
+		return copySheetSection(originSheet,originRowStart,originRowEnd,originColStart,originColEnd,destinationSheet,0,0,false);
+	}
+	public static Sheet copySheetSection(Sheet originSheet,
+			int originRowStart, int originRowEnd,
+			int originColStart, int originColEnd,
+			Sheet destinationSheet,boolean clearSection) {
+		return copySheetSection(originSheet,originRowStart,originRowEnd,originColStart,originColEnd,destinationSheet,0,0,clearSection);
+	}
+	public static Sheet copySheetSection(Sheet originSheet,
+			int originRowStart, int originRowEnd,
+			int originColStart, int originColEnd,
+			Sheet destinationSheet, int offsetRow, int offsetCol,
+			boolean clearSection) {
+		if (originSheet == null || destinationSheet == null) return null;
+		if (clearSection) {
+			clearSheetSection(destinationSheet,originRowStart+offsetRow,originRowEnd+offsetRow,originColStart+offsetCol,originColEnd+offsetCol);
+		}
+		originRowStart = originRowStart >= 0 ? originRowStart : originSheet.getFirstRowNum();
+		originRowEnd   = originRowEnd   >= 0 ? originRowEnd   : originSheet.getLastRowNum();
+		originColStart = originColStart >= 0 ? originColStart : getFirstColNum(originSheet);
+		originColEnd   = originColEnd   >= 0 ? originColEnd   : getLastColNum(originSheet);
+		Cell oc, dc;
+		System.out.println("Copy Sheet to:" + originRowStart + "," + originRowEnd + "," + originColStart + "," + originColEnd);
 		int i, j;
-		for (i = originRowStart; i < originRowEnd; i++) {
-			for (j = originRowStart; j < originRowEnd; j++) {
-				copyCell();
+		for (i = originRowStart; i <= originRowEnd; i++) {
+			for (j = originColStart; j <= originColEnd; j++) {
+				System.out.println("Fetching Cell: " + i +","+j);
+				oc = getCell(originSheet,i,j);
+				dc = getCell(destinationSheet,i+offsetRow,j+offsetCol,CELL_CREATE_NULL_AS_BLANK);
+				copyCell(oc,dc);
 			}
 		}
-
+		return destinationSheet;
 	}
-	public static void copyCell(Cell origin, Cell destination) {
-		copyCell(origin,destination,true);
+	public static Cell copyCell(Cell origin, Cell destination) {
+		return copyCell(origin,destination,true);
 	}
-	public static void copyCell(Cell origin, Cell destination, boolean copyAll) {
+	public static Cell copyCell(Cell origin, Cell destination, boolean copyAll) {
+		if (origin == null || destination == null) return null;
 		int originType = origin.getCellType();
 		switch (originType) {
 		case Cell.CELL_TYPE_BLANK:
@@ -120,6 +161,7 @@ public class ExcelUtils {
 						destination.setCellValue(cv);
 					}
 					 */
+					throw e;
 				}
 				/* Ensure the cell is properly formatted */
 				//destination.setCellStyle(numberCellStyle);
@@ -163,24 +205,52 @@ public class ExcelUtils {
 				e.printStackTrace();
 			}
 		}
-		return;
+		return destination;
 	}
 	public static void copyCell() {
 
 	}
+	/* Clearing methods */
 	public static Cell clearCell(Cell c) {
+		if (c == null) return null;
 		c.setCellType(Cell.CELL_TYPE_BLANK);
 		return c;
 	}
 	public static Row clearRow(Row r) {
-		for (Cell c: r) {
-			clearCell(c);
+		return clearRow(r,r.getFirstCellNum(),r.getLastCellNum());
+	}
+	public static Row clearRow(Row r, int col_i, int col_f) {
+		if (r == null) return null;
+		for (int i = col_i; i <= col_f; i++) {
+			clearCell(r.getCell(i));
 		}
 		return r;
 	}
 	public static Sheet clearSheet(Sheet s) {
-		for (Row r: s) {
+		if (s == null) return null;
+		for (Row r : s) {
 			clearRow(r);
+		}
+		return s;
+	}
+	public static Sheet clearSheetRows(Sheet s, int row_i, int row_f) {
+		return clearSheetSection(s,row_i,row_f,-1,-1);
+	}
+	public static Sheet clearSheetCols(Sheet s, int col_i, int col_f) {
+		return clearSheetSection(s,-1,-1,col_i,col_f);
+	}
+	// Clear a section of a sheet, allows for negative indices to escape to the known limits
+	public static Sheet clearSheetSection(Sheet s,int row_i,int row_f,int col_i,int col_f) {
+		if (s == null) return null;
+		int i, j;
+		row_i = row_i < 0 ? s.getFirstRowNum() : row_i;
+		row_f = row_f < 0 ? s.getLastRowNum() : row_f;
+		col_i = col_i < 0 ? getFirstColNum(s) : col_i;
+		col_f = col_f < 0 ? getLastColNum(s) : col_f;
+		for (i = row_i; i <= row_f; i++) {
+			for (j = col_i; j <= col_f; j++) {
+				clearCell(getCell(s,i,j));
+			}
 		}
 		return s;
 	}
@@ -197,6 +267,7 @@ public class ExcelUtils {
 		}
 		return r;
 	}
+	/* Cell retrieval methods */
 	public static Cell getCell(Sheet s, int row, int col) {
 		return getCell(s,row,col,false);
 	}
@@ -204,6 +275,7 @@ public class ExcelUtils {
 		if (s == null) return null;
 		Row r = getRow(s,row,create_null_as_blank);
 		if (r == null) return null; 
+		System.out.println(row + "," + col);
 		return create_null_as_blank ? getCell(r,col,create_null_as_blank) : getCell(r,col);
 	}
 	public static Cell getCell(Row r, int col) {
@@ -714,6 +786,25 @@ public class ExcelUtils {
 	private static boolean isNumeric(char c) {
 		return '0' <= c && '9' >= c;
 	}
+	/* Column methods */
+	public static int getFirstColNum(Sheet s) {
+		int col = Integer.MAX_VALUE;
+		for (Row r : s) {
+			for (Cell c : r) {
+				col = c.getColumnIndex() < col ? c.getColumnIndex() : col;
+				if (col == 0) return col; // Quick escape
+			}
+		}
+		return col;
+	}
+	// Can be long for large sheets
+	public static int getLastColNum(Sheet s) {
+		int col = -1;
+		for (Row r : s) {
+			col = r.getLastCellNum() > col ? r.getLastCellNum() : col;
+		}
+		return col;
+	}
 	/* retrieve Excel rows and cols */
 	public static int getExcelRow(String excelIndex) throws ExcelException{
 		String rowIndex = ""; char c; int i, L = excelIndex.length();
@@ -954,7 +1045,85 @@ public class ExcelUtils {
 		if (cell == null) return "Cell is null";
 		return "Cell " + convertIntToCol(cell.getColumnIndex()) + cell.getRowIndex() +  " on sheet " + cell.getSheet().getSheetName();
 	}
+	// Opens a workbook handling new and old Excel files	
+	public static Workbook openWorkbook(String filepath) throws Exception {
+		return openWorkbook(new File(filepath));
+	}
+	public static Workbook openWorkbook(File file) throws Exception {
+		if (file == null) {return null;}
+		// if csv, create blank workbook and copy over values into workbook
+		Workbook wb = null;
+		boolean isCSV = false, isExcel = false, isText = false;
 
+		String type = "";
+		try {
+			type = FileUtils.detectFileType(file);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		isExcel = type.equalsIgnoreCase("application/vnd.ms-excel") || type.equalsIgnoreCase("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		isCSV = type.equalsIgnoreCase("text/csv");
+		isText = type.contains("text/plain");
+		char delimChar, quotChar = '"';
+		if (isText || isCSV) {
+			if (isCSV) {
+				delimChar = ',';
+			} else {
+				delimChar = '\t';
+			}
+			int textCols = 0;
+			int i = 0, j = 0;
+			wb = new HSSFWorkbook();
+			Sheet s = wb.createSheet();Row r;Cell c;
+			String line;
+			ArrayList<String> parsedCSVLine;
+			BufferedReader reader = new BufferedReader(new FileReader(file));
+			while ((line = reader.readLine()) != null) {
+				parsedCSVLine = Helper.parseCSVLine(line,delimChar,quotChar);
+				textCols = parsedCSVLine.size();
+				r = s.getRow(i);
+				if (r == null ) {
+					r = s.createRow(i);
+				}
+				for (j = 0; j < textCols; j++) {
+					c = r.getCell(j, Row.CREATE_NULL_AS_BLANK);
+
+					if (c == null ) {
+						c = r.createCell(j,Cell.CELL_TYPE_BLANK);
+					}
+
+					try {
+						if (Helper.isNumeric(parsedCSVLine.get(j))) {
+							float val = Float.parseFloat(parsedCSVLine.get(j));
+							c.setCellType(Cell.CELL_TYPE_NUMERIC);
+							c.setCellValue(val);
+						} else if (Helper.isDate(parsedCSVLine.get(j))) {
+							String date = Helper.getDate(parsedCSVLine.get(j));
+							c.setCellType(Cell.CELL_TYPE_STRING);
+							c.setCellValue(date);
+						} else {
+							c.setCellType(Cell.CELL_TYPE_STRING);
+							c.setCellValue(parsedCSVLine.get(j));
+						}
+					} catch (Exception e) {
+						c.setCellType(Cell.CELL_TYPE_STRING);
+						c.setCellValue(parsedCSVLine.get(j));
+					}
+				}
+				i++;
+			}
+			reader.close();
+		} else if (isExcel) {
+			System.out.println("canary on else if");
+			wb = WorkbookFactory.create(file);
+		} else {
+			System.out.println("canary on else");
+			throw new ExcelException("File may be damaged or type is not recognized by excel.");
+		}
+		System.out.println("canary on end");
+		return wb;
+
+	}
 	/* Handle saving workbook */
 	public static boolean saveWorkbook(Workbook wb, String filename, String filepath, boolean makeDirs, boolean overwrite) throws Exception {
 		// if directories in the path do not exist, create them
@@ -989,19 +1158,12 @@ public class ExcelUtils {
 		}
 	}
 	public static void main(String args[]) {
-		Workbook wb = new org.apache.poi.hssf.usermodel.HSSFWorkbook();
-		Sheet s = wb.createSheet();
-		Row r = s.createRow(0);
-		Cell c = r.createCell(0);
-		c.setCellType(Cell.CELL_TYPE_NUMERIC);
-		c.setCellValue(9.9999);
-
-		System.out.println(checkCellValue(c,9.9999));
-		System.out.println(checkCellValue(c,9.999));
-		System.out.println(checkCellValue(c,9));
-		System.out.println(checkCellValue(c,(long)9.9999));
-		System.out.println(checkCellValue(c,(int)10));
-		System.out.println(checkCellValue(c,(float)9.9999));
-		System.out.println(checkCellValue(c,(double)9.9999));
+		Workbook wb = null;
+		try {
+			wb = openWorkbook(FileUtils.joinPath(FileUtils.getPWD(),"Newtyn Reconcile 01-24-14.xls"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		System.out.println(wb);
 	}
 }
