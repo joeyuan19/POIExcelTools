@@ -1,17 +1,31 @@
 package excelUtils;
 
-import java.io.File;
-import java.io.IOException;
-/*
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
+
+/*import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 */
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+
+//import javax.swing.JButton;
 import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+/*import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;*/
+
 
 //import org.apache.tika.Tika;
 
@@ -159,10 +173,11 @@ public class FileUtils {
 		return locateAndOpenFileRegex(regex,startingDirectory,recursive,"Locate file matching pattern: " + regex);
 	}
 	public static File locateAndOpenFileRegex(String regex, String startingDirectory, boolean recursive, String msg) {
-		Pattern pattern = Pattern.compile(regex);
+		Pattern pattern = Pattern.compile(regex,Pattern.CASE_INSENSITIVE);
 		return locateAndOpenFileRegex(pattern,startingDirectory,recursive,msg,0);
 	}
 	public static File locateAndOpenFileRegex(Pattern pattern, String startingDirectory, boolean recursive, String msg,int level) {
+		System.out.println(pattern.toString());
 		File locatedFile = null;
 		String curFileName;
 		File dir = new File(startingDirectory);
@@ -186,8 +201,7 @@ public class FileUtils {
 			}
 		}
 		if (locatedFile == null && level == 0) {
-			/* Manual Location required */
-			locatedFile = manualLocate(msg);
+			locatedFile = manualLocate(startingDirectory,msg);
 		} else if (locatedFile == null) {
 			for (File curFile: subDirs) {
 				locatedFile = locateAndOpenFileRegex(pattern,curFile.getAbsolutePath(),recursive,msg,level+1);
@@ -196,29 +210,41 @@ public class FileUtils {
 				}
 			}
 		}
+		if (locatedFile == null) {
+			locatedFile = manualLocate(startingDirectory,msg);
+		}
 		return locatedFile;
 	}
-	// Manual Location
+	/* Manual Location */
 	public static File manualLocate(String msg) {
 		return manualLocate(msg, false);
 	}
 	public static File manualLocate(String msg, boolean isDir) {
 		return manualLocate(System.getProperty("user.dir"),msg,isDir);
 	}
+	public static File manualLocate(String dir, String msg) {
+		return manualLocate(dir,msg,false);
+	}
 	public static File manualLocate(String dir, String msg, boolean isDir) {
+		return manualLocate(dir,msg,isDir,(JFrame)null);
+	}
+	public static File manualLocate(String dir, String msg, boolean isDir, JFrame frame) {
+		File located = null;
+		if (!(new File(dir)).exists()) dir = getPWD();
 		JFileChooser locator = new JFileChooser(dir);
 		if (isDir) {
 			locator.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 		}
 		locator.setDialogTitle(msg);
-		int returnVal = locator.showOpenDialog(null);
+		int returnVal = locator.showOpenDialog(frame);
 		if (returnVal == JFileChooser.APPROVE_OPTION) {
-			return locator.getSelectedFile();
+			located = locator.getSelectedFile();
 		} else {
-			return null;
+			located = null;
 		}
+		return located;
 	}
-	/* Locate folder */
+	/* Folder search */
 	public static File locateFolder(String folderName) {
 		return locateFolder(folderName,getPWD(),true,false,true);
 	}
@@ -258,7 +284,7 @@ public class FileUtils {
 		}
 		return null;
 	}
-	
+
 	/* File Type detection */
 	public static String detectFileType(File file) throws IOException {
 		return detectFileType(file.getAbsolutePath());
@@ -267,7 +293,7 @@ public class FileUtils {
 		/*
 		Path p = FileSystems.getDefault().getPath(path);
 		String mimeType = Files.probeContentType(p);
-		*/
+		 */
 		if (path.endsWith(".xls") || path.endsWith(".xlsx")){
 			return "application/vnd.ms-excel";
 		} else if (path.endsWith(".csv")){
@@ -276,10 +302,10 @@ public class FileUtils {
 			return "text/plain";
 		}
 		return "unknown";
-		
+
 	}
-	
-	
+
+
 	/* Ensured File deletion */
 	public static void deleteFile(File file) throws Exception {
 		if (file != null && file.exists()) {
@@ -291,8 +317,21 @@ public class FileUtils {
 	}
 
 	/* File path manipulation */
-	public static String joinPath(String path1, String path2) {
-		return path1 + (path1.endsWith(File.separator) ? "" : File.separator) + (path2.startsWith(File.separator) ? path2.substring(1) : path2);
+	public static String joinPath(String...paths) {
+		return joinPath(false,false,paths);
+	}
+	public static String joinPath(boolean relativePath, String...paths ){
+		return joinPath(false,relativePath,paths);
+	}
+	public static String joinPath(boolean trailingSeparator, boolean relativePath, String... paths) {
+		String path = "";
+		for (int i = 0; i < paths.length; i++) {
+			if (paths[i].length() > 0) {
+				path += (paths[i].startsWith(File.separator) ? (i == 0 && !relativePath ? paths[i] : paths[i].substring(1)) : paths[i]) +
+						(trailingSeparator ? (paths[i].endsWith(File.separator) ? "" : File.separator) : (i != paths.length-1 && !paths[i].endsWith(File.separator)) ? File.separator : ""); // Optional trailing separator
+			}
+		}
+		return path;
 	}
 	public static String shortenPath(String path) {
 		return shortenPath(path,1);
@@ -310,16 +349,117 @@ public class FileUtils {
 		}
 		return path.substring(index);
 	}
+	public static FileOutputStream getFileOutputStream(String path) throws IOException {
+		return getFileOutputStream(path,false,false);
+	}
+	public static FileOutputStream getFileOutputStream(String path, boolean create) throws IOException {
+		return getFileOutputStream(path,create,false);
+	}
+	public static FileOutputStream getFileOutputStream(String path, boolean create, boolean append) throws IOException {
+		File file = new File(path);
+		if (!file.exists() && create) {
+			file.createNewFile();
+		} else if (!file.exists()) {
+			return null;
+		}
+		FileOutputStream out = new FileOutputStream(path,append);
+		return out;
+	}
+	public static FileInputStream getFileInputStream(String path) throws IOException {
+		return getFileInputStream(path,false);
+	}
+	public static FileInputStream getFileInputStream(String path, boolean create) throws IOException {
+		File file = new File(path);
+		if (!file.exists() && create) {
+			file.createNewFile();
+		} else if (!file.exists()) {
+			return null;
+		}
+		FileInputStream in = new FileInputStream(path);
+		return in;
 
+	}
+
+	
+	
 	/* Main Method for tests */
 	public static void main(String args[]) {
-		File pwd = new File(getPWD());
-		for (File file : pwd.listFiles()) {
-			try {
-				System.out.println(file.getName() + "\n\t" + detectFileType(file));
-			} catch (IOException e) {
-				e.printStackTrace();
+		/*
+		SwingUtilities.invokeLater(new Runnable() {
+			@Override
+			public void run() {
+				JFrame frame = new JFrame();
+				JPanel panel = new JPanel();
+				panel.setLayout(new BorderLayout());
+
+				JPanel subPanel = new JPanel();
+				GridBagConstraints c = new GridBagConstraints();
+				subPanel.setLayout(new GridBagLayout());
+
+				c.anchor = GridBagConstraints.NORTHWEST;
+
+				JLabel regex_label = new JLabel("Regex");
+				c.gridx = 0;
+				c.gridy = 0;
+				subPanel.add(regex_label,c);
+
+				final JTextField regex = new JTextField();
+				regex.setColumns(20);
+				c.gridx = 1;
+				subPanel.add(regex,c);
+
+				JLabel search_label = new JLabel("search");
+				c.gridx = 0;
+				c.gridy = 1;
+				subPanel.add(search_label,c);
+
+				final JTextField search = new JTextField();
+				search.setColumns(20);
+				c.gridx = 1;
+				subPanel.add(search,c);
+
+				panel.add(subPanel,BorderLayout.NORTH);
+
+				final JTextArea results = new JTextArea(50,50);
+				panel.add(results,BorderLayout.CENTER);
+
+				final JButton match = new JButton("Match");
+				match.addActionListener(
+						new ActionListener() {
+							@Override
+							public void actionPerformed(ActionEvent e) {
+								match.setEnabled(false);
+								SwingUtilities.invokeLater(new Runnable() {
+									@Override
+									public void run() {
+										try {
+											String regex_pattern = Helper.parseToRegex(regex.getText());
+											String search_pattern = search.getText();
+											Pattern p = Pattern.compile(regex_pattern);
+											Matcher m = p.matcher(search_pattern);
+											String result_str = "";
+											while (m.find()) {
+												result_str += m.group() + "\n";
+											}
+											results.setText(result_str);
+										} catch (Exception e) {
+											e.printStackTrace();
+										} finally {
+
+											match.setEnabled(true);
+										}
+
+									}
+								});
+							} 
+						}
+						);
+				panel.add(match,BorderLayout.SOUTH);
+				frame.add(panel);
+				frame.setMinimumSize(new Dimension(500,500));
+				frame.setVisible(true);	
 			}
-		}
+		});
+		*/
 	}
 }

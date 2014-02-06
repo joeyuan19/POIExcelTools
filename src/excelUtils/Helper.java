@@ -1,10 +1,6 @@
 package excelUtils;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -43,6 +39,17 @@ public class Helper {
 		return date.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY ||
 				date.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY;
 	}
+	public static Calendar getToday() {
+		return Calendar.getInstance();
+	}
+	public static Calendar getYesterday() {
+		Calendar date = Calendar.getInstance();
+		date.add(Calendar.DATE,-1);
+		return date;
+	}
+	public static Calendar getLastWeekday() {
+		return getLastWeekday(getYesterday());
+	}
 	public static Calendar getLastWeekday(Calendar date) {
 		Calendar _date = Calendar.getInstance();
 		_date.setTime(date.getTime());
@@ -63,7 +70,7 @@ public class Helper {
 		}
 		return false;
 	}
-	public static String getDate(String entry) {
+	public static String parseDate(String entry) {
 		Pattern pattern = Pattern.compile(DATE_REGEX);
 		String[] terms = entry.split(" ");
 		Matcher matcher;
@@ -204,25 +211,172 @@ public class Helper {
 			}
 		}
 	}
-	public static void main(String args[]) {
-		File f = new File(FileUtils.joinPath(FileUtils.getPWD(),"bpmon.csv.140123110802.csv"));
-		BufferedReader reader;
-		try {
-			reader = new BufferedReader(new FileReader(f));
-			String line;
-			char d = ',', q='\"';
-			try {
-				while ((line = reader.readLine()) != null) {
-					Helper.parseCSVLine(line,d,q);
+	public static boolean isUpperAlpha(char c) {
+		return 'A' <= c && 'Z' >= c;
+	}
+	public static boolean isLowerAlpha(char c) {
+		return 'a' <= c && 'z' >= c;
+	}
+	public static boolean isAlpha(char c) {
+		return isUpperAlpha(c) || isLowerAlpha(c);
+	}
+	public static boolean isNumeric(char c) {
+		return '0' <= c && '9' >= c;
+	}
+	public static String formatYesterday() {
+		return formatDate("MM.dd.yy",0,0,-1);
+	}
+	public static String formatYesterday(String format) {
+		return formatDate(format,0,0,-1);
+	}
+	public static String formatToday() {
+		return formatDate("MM.dd.yy",0,0,0);
+	}
+	public static String formatToday(String format) {
+		return formatDate(format,0,0,0);
+	}
+	public static String formatLastWeekdayFormatted() {
+		return formatDate("MM.dd.yy",Helper.getLastWeekday());
+	}
+	public static String formatLastWeekday(String format) {
+		return formatDate(format,Helper.getLastWeekday());
+	}
+	public static String formatDate(String format, int offset_years, int offset_months, int offset_days) {
+		Calendar date = Calendar.getInstance();
+		date.add(Calendar.YEAR, offset_years);
+		date.add(Calendar.MONTH, offset_months);
+		date.add(Calendar.DATE, offset_days);
+		return formatDate(format,date);
+	}
+	public static String formatDate(Calendar c) {
+		return (new SimpleDateFormat("MM.dd.yy")).format(c.getTime());
+	}
+	public static String formatDate(String format, Calendar c) {
+		return (new SimpleDateFormat(format)).format(c.getTime());
+	} 
+	public static String parseToRegExcel(String raw) {
+		char c;
+		String buf = "", regExcel = "";
+		for (int i = 0; i < raw.length(); i++) {
+			c = raw.charAt(i);
+			if (isNumeric(c) && i+1 < raw.length() && isNumeric(raw.charAt(i+1))) {
+				while (isNumeric(c)) {
+					buf += c;
+					i++;
+					c = raw.charAt(i);
 				}
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				regExcel += parseRegExcelNumber(buf)+c;
+				buf = "";
+			} else {
+				regExcel += c;
 			}
-		} catch (FileNotFoundException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
 		}
+		return regExcel;
+	}
+	private static String parseRegExcelNumber(String number) {
+		String today_d = formatToday("dd"), 
+				today_m = formatToday("MM"), 
+				today_y = formatToday("yyyy");
+		String regex = "(" + today_y.substring(0,2) + ")?" + today_y.substring(2) + today_m + today_d;
+		Pattern p = Pattern.compile(regex);
+		Matcher m = p.matcher(number);
+		String buf = "";
+		if (m.find()) {
+			System.out.println(number+ " " + m.group() + " " + m.start());
+			if (m.group().length() == 6) {
+				buf = (m.start() == 0 ? "" : "<NUMBER>" ) + "<DATE:TODAY:YYMMDD>" + (m.end() == number.length() ? "" : "<NUMBER>");
+			} else {
+				buf = (m.start() == 0 ? "" : "<NUMBER>" ) + "<DATE:TODAY:YYYYMMDD>" + (m.end() == number.length() ? "" : "<NUMBER>");
+			}
+			return buf;
+		}
+		String yesterday_d = formatYesterday("dd"), 
+				yesterday_m = formatYesterday("MM"), 
+				yesterday_y = formatYesterday("yyyy");
+		regex = "(" + yesterday_y.substring(0,2) + ")?" + yesterday_y.substring(2) + yesterday_m + yesterday_d;
+		p = Pattern.compile(regex);
+		m = p.matcher(number);
+		buf = "";
+		System.out.println(regex);
+		if (m.find()) {
+			System.out.println(number+ " " + m.group() + " " + m.start());
+			if (m.group().length() == 6) {
+				buf = (m.start() == 0 ? "" : "<NUMBER>" ) + "<DATE:YESTERDAY:YYMMDD>" + (m.end() == number.length() ? "" : "<NUMBER>");
+			} else {
+				buf = (m.start() == 0 ? "" : "<NUMBER>" ) + "<DATE:YESTERDAY:YYYYMMDD>" + (m.end() == number.length() ? "" : "<NUMBER>");
+			}
+			return buf;
+		}
+		return "<NUMBER>";
 		
+	}
+	public static String parseToRegex(String raw) {
+		char c;
+		int depth = 0;
+		String buf = "",regex = "";
+		for (int i = 0; i < raw.length() ;i++) {
+			c = raw.charAt(i);
+			if (i > 0 && c == '.' && raw.charAt(i-1) != '\\') {
+				buf = "\\.";
+			} else if (c == '<') {
+				depth++;
+				buf = "";
+				while (depth > 0 && i < raw.length()) {
+					i++;
+					c = raw.charAt(i);
+					if (c == '<') {
+						depth++;
+						buf += c;
+					} else if (c == '>') {
+						depth--;
+						if (depth == 0) {
+							break;
+						}
+					} else {
+						buf += c;
+					}
+				}
+				if (buf.equalsIgnoreCase("NUMBER")) {
+					buf = "\\d+";
+				} else if (buf.toLowerCase().contains("DATE".toLowerCase())) {
+					buf = "{$@"+buf+"@$}";
+				} else if (buf.equalsIgnoreCase("RANDOM")) {
+					buf = ".*?";
+				} else {
+					buf = ".*";
+				}
+			} else {
+				buf += c;
+			}
+			regex += buf;
+			buf = "";
+		}
+		int begin, end;
+		String format;
+		begin = regex.indexOf("{$@DATE:")+("{$@DATE:").length();
+		end = regex.indexOf("@$}",begin);
+		while (begin > 0 && end > 0) {
+			format = regex.substring(begin,end);
+			if (format.toLowerCase().contains("TODAY".toLowerCase())) {
+				begin = regex.toLowerCase().indexOf("{$@DATE:TODAY:".toLowerCase())+("{$@DATE:TODAY:").length();
+				format = regex.substring(begin,end);
+				format = format.replace('m', 'M').replace('D', 'd').replace('Y', 'y');
+				regex = regex.substring(0,begin-("{$@DATE:TODAY:").length()) + formatToday(format) + regex.substring(end+("@$}").length());
+			} else if (format.toLowerCase().contains("TODAY".toLowerCase())) {
+				begin = regex.toLowerCase().indexOf("{$@DATE:YESTERDAY:".toLowerCase())+("{$@DATE:YESTERDAY:").length();
+				format = regex.substring(begin,end);
+				format = format.replace('m', 'M').replace('D', 'd').replace('Y', 'y');
+				regex = regex.substring(0,begin-("{$@DATE:YESTERDAY:").length()) + formatYesterday(format) + regex.substring(end+("@$}").length());
+			} else {
+				format = format.replace('m', 'M').replace('D', 'd').replace('Y', 'y');
+				regex = regex.substring(0,begin-("{$@DATE:").length()) + formatToday(format) + regex.substring(end+("@$}").length());
+			}
+			begin = regex.indexOf("{$@DATE:")+("{$@DATE:").length();
+			end = regex.indexOf("@$}",begin);
+		}
+		return regex;
+	}
+	public static void main(String args[]) {
+		System.out.println(FileUtils.parseExt(parseToRegExcel("bpmon.csv.140203110802.csv")));
 	}
 }

@@ -76,11 +76,9 @@ public class ExcelUtils {
 		originColStart = originColStart >= 0 ? originColStart : getFirstColNum(originSheet);
 		originColEnd   = originColEnd   >= 0 ? originColEnd   : getLastColNum(originSheet);
 		Cell oc, dc;
-		System.out.println("Copy Sheet to:" + originRowStart + "," + originRowEnd + "," + originColStart + "," + originColEnd);
 		int i, j;
 		for (i = originRowStart; i <= originRowEnd; i++) {
 			for (j = originColStart; j <= originColEnd; j++) {
-				System.out.println("Fetching Cell: " + i +","+j);
 				oc = getCell(originSheet,i,j);
 				dc = getCell(destinationSheet,i+offsetRow,j+offsetCol,CELL_CREATE_NULL_AS_BLANK);
 				copyCell(oc,dc);
@@ -275,7 +273,7 @@ public class ExcelUtils {
 		if (s == null) return null;
 		Row r = getRow(s,row,create_null_as_blank);
 		if (r == null) return null; 
-		System.out.println(row + "," + col);
+		
 		return create_null_as_blank ? getCell(r,col,create_null_as_blank) : getCell(r,col);
 	}
 	public static Cell getCell(Row r, int col) {
@@ -759,11 +757,11 @@ public class ExcelUtils {
 		String numberIndex = "";
 		for (i = 0; i < L; i++) {
 			c = index.charAt(i);
-			if (isAlpha(c)) {
+			if (Helper.isAlpha(c)) {
 				if (numberIndex.length() != 0) {
 					return false;
 				}
-			} else if (isNumeric(c)) {
+			} else if (Helper.isNumeric(c)) {
 				numberIndex += c;
 			} else {
 				return false;
@@ -774,18 +772,7 @@ public class ExcelUtils {
 		}
 		return true;
 	}
-	private static boolean isUpperAlpha(char c) {
-		return 'A' <= c && 'Z' >= c;
-	}
-	private static boolean isLowerAlpha(char c) {
-		return 'a' <= c && 'z' >= c;
-	}
-	private static boolean isAlpha(char c) {
-		return isUpperAlpha(c) || isLowerAlpha(c);
-	}
-	private static boolean isNumeric(char c) {
-		return '0' <= c && '9' >= c;
-	}
+	
 	/* Column methods */
 	public static int getFirstColNum(Sheet s) {
 		int col = Integer.MAX_VALUE;
@@ -810,11 +797,11 @@ public class ExcelUtils {
 		String rowIndex = ""; char c; int i, L = excelIndex.length();
 		for (i = 0; i < L; i++) {
 			c = excelIndex.charAt(i);
-			if (isAlpha(c) && rowIndex.length() > 0) { 
+			if (Helper.isAlpha(c) && rowIndex.length() > 0) { 
 				throw new ExcelException("Invalid Excel Cell address Given: " + excelIndex +"."+
 						"  Excel Indexes must have the letter column before any row number");
 			}
-			if (isNumeric(c)) {
+			if (Helper.isNumeric(c)) {
 				rowIndex += c;
 			}
 		}
@@ -831,10 +818,10 @@ public class ExcelUtils {
 		String colIndex = ""; char c; int i, L = excelIndex.length();
 		for (i = 0; i < L; i++) {
 			c = excelIndex.charAt(i);
-			if (isAlpha(c)) { 
+			if (Helper.isAlpha(c)) { 
 				colIndex += c;
 			}
-			if (isNumeric(c)) {
+			if (Helper.isNumeric(c)) {
 				break;
 			}
 		}
@@ -896,7 +883,7 @@ public class ExcelUtils {
 		for (i = 0; i < formula.length(); i++) {
 			c = formula.charAt(i);
 			if (c == '\'') {
-				if (buf.length() > 0 && buf.length() < 4 && i-buf.length()-1 >= 0 && isUpperAlpha(formula.charAt(i-buf.length()-1))) {
+				if (buf.length() > 0 && buf.length() < 4 && i-buf.length()-1 >= 0 && Helper.isUpperAlpha(formula.charAt(i-buf.length()-1))) {
 					if (!skipNext) {
 						new_formula += carefulRowFormulaRefactorString(buf,sourceRow,copyRow);
 						buf = "";
@@ -913,7 +900,7 @@ public class ExcelUtils {
 				new_formula += c;
 			} else if (!inParen) {
 				if (c == '$') {
-					if (buf.length() > 0 && buf.length() < 4 && i-buf.length()-1 >= 0 && isUpperAlpha(formula.charAt(i-buf.length()-1))) {
+					if (buf.length() > 0 && buf.length() < 4 && i-buf.length()-1 >= 0 && Helper.isUpperAlpha(formula.charAt(i-buf.length()-1))) {
 						if (!skipNext) {
 							new_formula += carefulColFormulaRefactorString(buf,sourceRow,copyRow);
 							buf = "";
@@ -929,15 +916,15 @@ public class ExcelUtils {
 					skipNext = true;
 					new_formula += c;
 				} else if (skipNext) {
-					if (!isNumeric(c)) {
+					if (!Helper.isNumeric(c)) {
 						skipNext = false;
 					}
 					new_formula += c;
 				} else {
-					if (isNumeric(c)) {
+					if (Helper.isNumeric(c)) {
 						buf += c;
 					} else {
-						if (buf.length() > 0 && i-buf.length()-1 >= 0 && isUpperAlpha(formula.charAt(i-buf.length()-1))) {
+						if (buf.length() > 0 && i-buf.length()-1 >= 0 && Helper.isUpperAlpha(formula.charAt(i-buf.length()-1))) {
 							new_formula += carefulRowFormulaRefactorString(buf,sourceRow,copyRow);
 							buf = "";
 						} else {
@@ -951,7 +938,7 @@ public class ExcelUtils {
 				new_formula += c;
 			}
 		}
-		if (!skipNext && !inParen && buf.length() > 0 && i-buf.length()-1 >= 0 && isUpperAlpha(formula.charAt(i-buf.length()-1))) {
+		if (!skipNext && !inParen && buf.length() > 0 && i-buf.length()-1 >= 0 && Helper.isUpperAlpha(formula.charAt(i-buf.length()-1))) {
 			new_formula += carefulRowFormulaRefactorString(buf,sourceRow,copyRow);
 			buf = "";
 		} else {
@@ -1005,12 +992,12 @@ public class ExcelUtils {
 					skipNext = true;
 					new_formula += c;
 				} else if (skipNext) {
-					if (!isUpperAlpha(c)) {
+					if (!Helper.isUpperAlpha(c)) {
 						skipNext = false;
 					}
 					new_formula += c;
 				} else {
-					if (isUpperAlpha(c)) {
+					if (Helper.isUpperAlpha(c)) {
 						buf += c;
 					} else {
 						if (buf.length() > 0 && buf.length() < 4) {
@@ -1098,7 +1085,7 @@ public class ExcelUtils {
 							c.setCellType(Cell.CELL_TYPE_NUMERIC);
 							c.setCellValue(val);
 						} else if (Helper.isDate(parsedCSVLine.get(j))) {
-							String date = Helper.getDate(parsedCSVLine.get(j));
+							String date = Helper.parseDate(parsedCSVLine.get(j));
 							c.setCellType(Cell.CELL_TYPE_STRING);
 							c.setCellValue(date);
 						} else {
@@ -1114,15 +1101,11 @@ public class ExcelUtils {
 			}
 			reader.close();
 		} else if (isExcel) {
-			System.out.println("canary on else if");
 			wb = WorkbookFactory.create(file);
 		} else {
-			System.out.println("canary on else");
 			throw new ExcelException("File may be damaged or type is not recognized by excel.");
 		}
-		System.out.println("canary on end");
 		return wb;
-
 	}
 	/* Handle saving workbook */
 	public static boolean saveWorkbook(Workbook wb, String filename, String filepath, boolean makeDirs, boolean overwrite) throws Exception {
@@ -1158,12 +1141,5 @@ public class ExcelUtils {
 		}
 	}
 	public static void main(String args[]) {
-		Workbook wb = null;
-		try {
-			wb = openWorkbook(FileUtils.joinPath(FileUtils.getPWD(),"Newtyn Reconcile 01-24-14.xls"));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		System.out.println(wb);
 	}
 }
